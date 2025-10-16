@@ -9,7 +9,7 @@ import { Plus, X, Scan } from 'lucide-react';
 import { Product } from '@/types/pos';
 import { QuantitySelector } from './QuantitySelector';
 import { toast } from 'sonner';
-import { BarcodeScanner } from '@capacitor-community/barcode-scanner';
+import { BarcodeScanner } from '@capacitor-mlkit/barcode-scanning';
 import { Capacitor } from '@capacitor/core';
 import { useStore } from '@/contexts/StoreContext';
 
@@ -190,24 +190,20 @@ export default function AddProductForm({ onAddProduct, onUpdateProduct, products
         return;
       }
 
-      const status = await BarcodeScanner.checkPermission({ force: true });
-      if (!status.granted) {
+      const { camera } = await BarcodeScanner.requestPermissions();
+      if (camera !== 'granted') {
         toast.error('Izin kamera diperlukan untuk scan barcode');
         return;
       }
 
       setIsScanning(true);
-      document.body.classList.add('scanner-active');
-      await BarcodeScanner.hideBackground();
 
-      const result = await BarcodeScanner.startScan();
+      const result = await BarcodeScanner.scan();
 
-      document.body.classList.remove('scanner-active');
-      await BarcodeScanner.showBackground();
       setIsScanning(false);
 
-      if (result.hasContent) {
-        const scannedCode = result.content;
+      if (result.barcodes && result.barcodes.length > 0) {
+        const scannedCode = result.barcodes[0].rawValue;
         const foundProduct = products.find(p => 
           p.barcode === scannedCode || p.code === scannedCode
         );
@@ -236,18 +232,9 @@ export default function AddProductForm({ onAddProduct, onUpdateProduct, products
       }
     } catch (error) {
       console.error('Barcode scan error:', error);
-      document.body.classList.remove('scanner-active');
-      await BarcodeScanner.showBackground();
       setIsScanning(false);
       toast.error('Gagal scan barcode');
     }
-  };
-
-  const stopScanning = async () => {
-    await BarcodeScanner.stopScan();
-    document.body.classList.remove('scanner-active');
-    await BarcodeScanner.showBackground();
-    setIsScanning(false);
   };
 
   return (
@@ -489,16 +476,12 @@ export default function AddProductForm({ onAddProduct, onUpdateProduct, products
         </Tabs>
       </CardContent>
 
+      {/* Scanning overlay - ML Kit handles its own UI */}
       {isScanning && (
-        <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-black">
-          <div className="text-white text-center mb-8">
-            <p className="text-xl mb-2">Arahkan kamera ke barcode</p>
-            <p className="text-sm text-gray-400">Barcode akan otomatis terdeteksi</p>
-          </div>
-          <div className="absolute bottom-8">
-            <Button onClick={stopScanning} variant="outline" size="lg">
-              Batal
-            </Button>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80">
+          <div className="text-white text-center">
+            <p className="text-xl mb-2">Scanning...</p>
+            <p className="text-sm text-gray-400">Scanner aktif - gunakan tombol back untuk membatalkan</p>
           </div>
         </div>
       )}
