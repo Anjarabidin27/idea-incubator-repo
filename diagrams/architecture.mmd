@@ -1,0 +1,77 @@
+%% Architecture Diagram - KasirQ POS System
+%% Gunakan di https://mermaid.live untuk visualisasi
+
+graph TB
+    subgraph "Client Layer"
+        WEB[Web Browser<br/>React + Vite]
+        MOBILE[Mobile App<br/>Capacitor Android/iOS]
+        POSTMAN[Postman<br/>API Testing]
+    end
+
+    subgraph "Supabase Platform"
+        subgraph "API Gateway"
+            POSTGREST[PostgREST<br/>Auto-generated REST API]
+            REALTIME[Realtime Server<br/>WebSocket]
+            AUTH[Supabase Auth<br/>JWT Authentication]
+            STORAGE[Supabase Storage<br/>S3-compatible]
+        end
+
+        subgraph "Serverless Functions"
+            EDGE1[reset-password<br/>Edge Function]
+            EDGE2[notify-admin<br/>Edge Function]
+            EDGE3[upload-qris<br/>Edge Function]
+        end
+
+        subgraph "Database Layer"
+            PG[(PostgreSQL 15<br/>Main Database)]
+            RLS[Row Level Security<br/>Policies]
+            TRIGGERS[Database Triggers<br/>& Functions]
+        end
+    end
+
+    subgraph "External Services"
+        EMAIL[Email Service<br/>Optional]
+        WHATSAPP[WhatsApp API<br/>Optional]
+    end
+
+    WEB --> POSTGREST
+    WEB --> REALTIME
+    WEB --> AUTH
+    WEB --> STORAGE
+    WEB --> EDGE1
+    WEB --> EDGE2
+    WEB --> EDGE3
+    
+    MOBILE --> POSTGREST
+    MOBILE --> REALTIME
+    MOBILE --> AUTH
+    
+    POSTMAN --> POSTGREST
+    POSTMAN --> EDGE1
+    
+    POSTGREST --> RLS
+    RLS --> PG
+    TRIGGERS --> PG
+    
+    AUTH --> PG
+    REALTIME --> PG
+    STORAGE --> PG
+    
+    EDGE1 --> AUTH
+    EDGE2 --> PG
+    EDGE2 --> EMAIL
+    EDGE2 --> WHATSAPP
+    EDGE3 --> STORAGE
+    EDGE3 --> PG
+
+    classDef client fill:#e1f5ff,stroke:#01579b,stroke-width:2px
+    classDef gateway fill:#fff9c4,stroke:#f57f17,stroke-width:2px
+    classDef function fill:#f3e5f5,stroke:#4a148c,stroke-width:2px
+    classDef database fill:#e8f5e9,stroke:#1b5e20,stroke-width:2px
+    classDef external fill:#fce4ec,stroke:#880e4f,stroke-width:2px
+
+    class WEB,MOBILE,POSTMAN client
+    class POSTGREST,REALTIME,AUTH,STORAGE gateway
+    class EDGE1,EDGE2,EDGE3 function
+    class PG,RLS,TRIGGERS database
+    class EMAIL,WHATSAPP external

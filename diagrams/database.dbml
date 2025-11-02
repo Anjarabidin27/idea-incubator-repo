@@ -1,0 +1,189 @@
+// Database Schema untuk KasirQ POS System
+// Gunakan di https://dbdiagram.io untuk generate ERD
+
+Project KasirQ_POS {
+  database_type: 'PostgreSQL'
+  Note: '''
+    # KasirQ POS Database Schema
+    Point of Sale & PPOB System
+    Backend: Supabase (PostgreSQL 15)
+  '''
+}
+
+// Authentication (Supabase Auth)
+Table auth_users {
+  id uuid [pk]
+  email text [unique, not null]
+  encrypted_password text [not null]
+  email_confirmed_at timestamptz
+  raw_user_meta_data jsonb
+  created_at timestamptz [default: `now()`]
+  
+  Note: 'Managed by Supabase Auth - Do not modify directly'
+}
+
+// User Profiles
+Table profiles {
+  user_id uuid [pk, ref: - auth_users.id]
+  email text [unique, not null]
+  username text [unique]
+  full_name text
+  display_name text
+  avatar_url text
+  is_approved boolean [default: true]
+  approved_by uuid [ref: > auth_users.id]
+  approved_at timestamptz
+  created_at timestamptz [default: `now()`]
+  updated_at timestamptz [default: `now()`]
+  
+  indexes {
+    username
+    email
+  }
+  
+  Note: 'User profile data - created automatically on signup'
+}
+
+// User Roles (RBAC)
+Table user_roles {
+  id uuid [pk, default: `gen_random_uuid()`]
+  user_id uuid [ref: > auth_users.id, not null]
+  role app_role [not null]
+  created_at timestamptz [default: `now()`]
+  
+  indexes {
+    (user_id, role) [unique]
+  }
+  
+  Note: 'Role-Based Access Control - admin | kasir'
+}
+
+Enum app_role {
+  admin
+  kasir
+}
+
+// Store Configuration
+Table stores {
+  id uuid [pk, default: `gen_random_uuid()`]
+  name text [not null]
+  category text
+  address text
+  phone text
+  whatsapp_number text
+  cashier_name text
+  opening_hours text
+  closing_hours text
+  bank_name text
+  bank_account_number text
+  bank_account_holder text
+  qris_image_url text
+  dana_number text
+  gopay_number text
+  ovo_number text
+  shopeepay_number text
+  ewallet_number text
+  admin_password text
+  settings_password text
+  owner_id uuid [ref: > auth_users.id, not null]
+  created_at timestamptz [default: `now()`]
+  updated_at timestamptz [default: `now()`]
+  
+  Note: 'Store settings & configuration - single store per deployment'
+}
+
+// Products Master
+Table products {
+  id uuid [pk, default: `gen_random_uuid()`]
+  name text [not null]
+  barcode text [unique]
+  cost_price numeric [not null, default: 0]
+  sell_price numeric [not null, default: 0]
+  stock integer [not null, default: 0]
+  unit text [default: 'pcs']
+  category text
+  is_photocopy boolean [default: false]
+  image_url text
+  created_at timestamptz [default: `now()`]
+  updated_at timestamptz [default: `now()`]
+  
+  indexes {
+    barcode
+    category
+    name
+  }
+  
+  Note: 'Product master data - includes PPOB products & services'
+}
+
+// Sales Receipts
+Table receipts {
+  id text [pk, note: 'Invoice number as ID']
+  user_id uuid [ref: > auth_users.id, not null]
+  invoice_number text [unique, not null]
+  subtotal numeric [not null, default: 0]
+  discount numeric [not null, default: 0]
+  total numeric [not null, default: 0]
+  profit numeric [not null, default: 0]
+  payment_method text [default: 'tunai']
+  created_at timestamptz [default: `now()`]
+  
+  indexes {
+    invoice_number
+    user_id
+    created_at
+    (user_id, created_at)
+  }
+  
+  Note: 'Sales transaction receipts - profit calculated automatically'
+}
+
+// Receipt Line Items
+Table receipt_items {
+  id uuid [pk, default: `gen_random_uuid()`]
+  receipt_id text [ref: > receipts.id, not null]
+  product_id uuid [ref: > products.id]
+  product_name text [not null]
+  quantity integer [not null, default: 1]
+  unit_price numeric [not null, default: 0]
+  cost_price numeric [not null, default: 0]
+  total_price numeric [not null, default: 0]
+  profit numeric [not null, default: 0]
+  created_at timestamptz [default: `now()`]
+  
+  indexes {
+    receipt_id
+    product_id
+  }
+  
+  Note: 'Receipt line items - product_id nullable for deleted products'
+}
+
+// Shopping List (Collaborative)
+Table shopping_items {
+  id uuid [pk, default: `gen_random_uuid()`]
+  user_id uuid [ref: > auth_users.id, not null]
+  name text [not null]
+  quantity integer
+  unit text [default: 'pcs']
+  current_stock integer
+  notes text
+  is_completed boolean [default: false]
+  created_at timestamptz [default: `now()`]
+  updated_at timestamptz [default: `now()`]
+  
+  indexes {
+    user_id
+    is_completed
+  }
+  
+  Note: 'Collaborative shopping list for inventory planning'
+}
+
+// Relationships Summary
+// - One user can have multiple roles (user_roles)
+// - One user can create multiple receipts
+// - One receipt has multiple receipt_items
+// - One product can be in multiple receipt_items
+// - One user can create multiple shopping_items
+// - Store belongs to one owner (user)

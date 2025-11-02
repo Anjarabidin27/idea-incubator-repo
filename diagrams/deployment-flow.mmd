@@ -1,0 +1,57 @@
+%% Deployment Flow Diagram - KasirQ POS
+%% Gunakan di https://mermaid.live untuk visualisasi
+
+flowchart TD
+    START([Developer: Code Changes]) --> GIT[Git Commit & Push]
+    
+    GIT --> GITHUB[GitHub Repository]
+    
+    GITHUB --> ACTIONS{GitHub Actions<br/>CI/CD Pipeline}
+    
+    ACTIONS -->|Build| BUILD[Docker Build<br/>Multi-stage]
+    
+    BUILD -->|Stage 1| BUILDER[Builder Stage<br/>npm ci & build]
+    BUILDER --> DIST[Production Bundle<br/>dist/]
+    
+    BUILD -->|Stage 2| PROD[Production Stage<br/>Copy dist + serve]
+    DIST --> PROD
+    
+    PROD --> IMAGE[Docker Image<br/>~150MB]
+    
+    ACTIONS -->|Test| TEST[Run Tests<br/>Unit + Integration]
+    
+    TEST -->|Pass| REGISTRY[Docker Registry<br/>Docker Hub / GitHub CR]
+    IMAGE --> REGISTRY
+    
+    TEST -->|Fail| NOTIFY_FAIL[Notify Developer<br/>Build Failed]
+    NOTIFY_FAIL --> START
+    
+    REGISTRY -->|Deploy| DEPLOY{Deployment Target}
+    
+    DEPLOY -->|Development| DEV_SERVER[Dev Server<br/>docker-compose up]
+    DEPLOY -->|Staging| STAGING_SERVER[Staging Server<br/>Auto Deploy]
+    DEPLOY -->|Production| PROD_SERVER[Production Server<br/>Manual Approve]
+    
+    DEV_SERVER --> HEALTH_CHECK[Health Check<br/>HTTP GET /]
+    STAGING_SERVER --> HEALTH_CHECK
+    PROD_SERVER --> HEALTH_CHECK
+    
+    HEALTH_CHECK -->|Healthy| NGINX[Nginx Reverse Proxy<br/>Port 80/443]
+    HEALTH_CHECK -->|Unhealthy| ROLLBACK[Rollback to<br/>Previous Version]
+    
+    ROLLBACK --> NOTIFY_FAIL
+    
+    NGINX --> LIVE[Live Application<br/>Accessible to Users]
+    
+    LIVE --> MONITOR[Monitoring<br/>Logs + Metrics]
+    MONITOR --> ALERT{Issues Detected?}
+    
+    ALERT -->|Yes| NOTIFY_FAIL
+    ALERT -->|No| SUCCESS([Deployment Success])
+    
+    style START fill:#e8f5e9
+    style SUCCESS fill:#e8f5e9
+    style NOTIFY_FAIL fill:#ffebee
+    style LIVE fill:#e3f2fd
+    style HEALTH_CHECK fill:#fff9c4
+    style ROLLBACK fill:#ffebee
